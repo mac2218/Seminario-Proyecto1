@@ -2,14 +2,11 @@ import os
 import glob
 import pandas as pd
 
-# =========================================================
-# CONFIGURACIÓN
-# =========================================================
 CARPETA = os.path.expanduser("~/Downloads/Datos Ecobici")
 CARPETA_SALIDA = os.path.join(CARPETA, "parquet_procesados")
 os.makedirs(CARPETA_SALIDA, exist_ok=True)
 
-CHUNK_SIZE = 300_000  # puedes subir a 500_000 si tu PC aguanta
+CHUNK_SIZE = 300_000  
 
 COLUMNAS_FINALES = [
     "Genero_Usuario",
@@ -45,9 +42,6 @@ MAPEO_COLUMNAS = {
     "hora arribo": "Hora_Arribo",
 }
 
-# =========================================================
-# FUNCIONES
-# =========================================================
 def normalizar_nombre(col: str) -> str:
     col = str(col).strip().lower()
     col = " ".join(col.split())
@@ -68,7 +62,7 @@ def limpiar_chunk(df: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = pd.NA
 
-    # Quedarnos solo con las columnas importantes
+    # Conservar solo con las columnas importantes
     df = df[COLUMNAS_FINALES].copy()
 
     # Limpiar strings
@@ -101,7 +95,7 @@ def limpiar_chunk(df: pd.DataFrame) -> pd.DataFrame:
         errors="coerce"
     )
 
-    # Variables derivadas
+    # Variables 
     df["Anio"] = df["FechaHora_Retiro"].dt.year.astype("Float32")
     df["Mes"] = df["FechaHora_Retiro"].dt.month.astype("Float32")
     df["DiaSemana"] = df["FechaHora_Retiro"].dt.dayofweek.astype("Float32")  # 0=lunes, 6=domingo
@@ -113,7 +107,7 @@ def limpiar_chunk(df: pd.DataFrame) -> pd.DataFrame:
         (df["FechaHora_Arribo"] - df["FechaHora_Retiro"]).dt.total_seconds() / 60
     ).astype("Float32")
 
-    # Filtrar duraciones absurdas
+    # Filtrar duraciones muy largas
     df = df[
         df["Duracion_Minutos"].isna() |
         ((df["Duracion_Minutos"] >= 0) & (df["Duracion_Minutos"] <= 300))
@@ -121,9 +115,6 @@ def limpiar_chunk(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-# =========================================================
-# PROCESAMIENTO
-# =========================================================
 archivos = sorted(glob.glob(os.path.join(CARPETA, "*.csv")))
 
 if not archivos:
@@ -149,7 +140,7 @@ for archivo in archivos:
         for chunk in pd.read_csv(
             archivo,
             sep=sep,
-            dtype=str,              # <- TODO como texto, aquí está la clave
+            dtype=str,              
             chunksize=CHUNK_SIZE,
             encoding="utf-8",
             encoding_errors="replace",
@@ -164,8 +155,6 @@ for archivo in archivos:
             raise ValueError("No se pudo procesar ningún chunk.")
 
         df_final = pd.concat(partes, ignore_index=True)
-
-        # Guardar parquet
         df_final.to_parquet(salida_parquet, index=False, engine="pyarrow", compression="snappy")
 
         resumen.append((nombre, len(df_final)))
@@ -179,9 +168,6 @@ for archivo in archivos:
         errores.append((nombre, str(e)))
         print(f"  Error en {nombre}: {e}\n")
 
-# =========================================================
-# RESUMEN
-# =========================================================
 print("\nProceso terminado.\n")
 print("Archivos procesados correctamente:")
 for nombre, filas in resumen:
